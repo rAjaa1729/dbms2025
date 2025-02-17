@@ -1,3 +1,4 @@
+%%sql
 create table season(
     season_id varchar(20) primary key not null,
     year smallint check(year between 1900 and 2025) not null,
@@ -121,7 +122,7 @@ create table wickets (
     check(
         (kind_out in ('caught','runout','stumped') and fielder_id is not null)
         or (kind_out not in  ('caught','runout','stumped'))
-    )
+    ),
     primary key (match_id,innings_num,over_num,ball_num),
     foreign key (match_id,innings_num,over_num,ball_num)
         references balls(match_id,innings_num,over_num,ball_num)
@@ -136,9 +137,9 @@ create table awards(
 );
 
 
-
+-- wicket keeper validation
 create or replace function validate_wicketkeeper_role()
-return trigger as $$
+returns trigger as $$
 begin 
     if new.kind_out = 'stumped' then
         if not exists (
@@ -151,7 +152,7 @@ begin
             raise exception 'for stumped dismissal, fielder must be a wicketkeeper';
         end if;
     end if;
-    return new
+    return new;
 end;
 $$ language plpgsql;
 
@@ -159,3 +160,34 @@ create trigger check_wicketkeeper_role
 before insert or update on wickets
 for each row 
 execute function validate_wicketkeeper_role();
+
+-- automatic insertion into player team
+create or replace function play_team_by_auction()
+returns trigger as $$
+begin 
+    if new.is_sold = true then
+        insert into player_team (player_id,team_id,season_id)
+        values (new.player_id,new.team_id,new.season_id);
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger player_team_dueto_auction
+after insert on auction
+for each row
+execute function play_team_by_auction();
+
+-- automatic season id generation
+create or replace function update_season_id()
+returns trigger  as $$
+begin
+    new.season_id = 'IPL' || new.year;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger generate_season_id
+before insert on season
+for each row
+execute function update_season_id();
