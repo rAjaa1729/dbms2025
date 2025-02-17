@@ -1,0 +1,136 @@
+# Created at 2025-02-06T17:16:06.492
+Exiting self fork JVM. Received SHUTDOWN command from Maven shutdown hook.
+Thread dump before exiting the process (40508@AcerBaranwal):
+"PostgreSQL-JDBC-Cleaner" 
+   java.lang.Thread.State: TIMED_WAITING
+        at java.lang.Object.wait(Native Method)
+        at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:144)
+        at org.postgresql.util.LazyCleaner$1.run(LazyCleaner.java:131)
+        at java.lang.Thread.run(Thread.java:748)
+
+"surefire-forkedjvm-command-thread" 
+   java.lang.Thread.State: RUNNABLE
+        at sun.management.ThreadImpl.getThreadInfo1(Native Method)
+        at sun.management.ThreadImpl.getThreadInfo(ThreadImpl.java:178)
+        at org.apache.maven.surefire.booter.ForkedBooter.generateThreadDump(ForkedBooter.java:683)
+        at org.apache.maven.surefire.booter.ForkedBooter.access$600(ForkedBooter.java:80)
+        at org.apache.maven.surefire.booter.ForkedBooter$4.update(ForkedBooter.java:368)
+        at org.apache.maven.surefire.booter.CommandReader$CommandRunnable.callListeners(CommandReader.java:426)
+        at org.apache.maven.surefire.booter.CommandReader$CommandRunnable.exitByConfiguration(CommandReader.java:438)
+        at org.apache.maven.surefire.booter.CommandReader$CommandRunnable.run(CommandReader.java:390)
+        at java.lang.Thread.run(Thread.java:748)
+
+"surefire-forkedjvm-stream-flusher" 
+   java.lang.Thread.State: TIMED_WAITING
+        at sun.misc.Unsafe.park(Native Method)
+        at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+        at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)
+        at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:1093)
+        at java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take(ScheduledThreadPoolExecutor.java:809)
+        at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+        at java.lang.Thread.run(Thread.java:748)
+
+"Attach Listener" 
+   java.lang.Thread.State: RUNNABLE
+
+"Signal Dispatcher" 
+   java.lang.Thread.State: RUNNABLE
+
+"Finalizer" 
+   java.lang.Thread.State: WAITING
+        at java.lang.Object.wait(Native Method)
+        at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:144)
+        at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:165)
+        at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:216)
+
+"Reference Handler" 
+   java.lang.Thread.State: WAITING
+        at java.lang.Object.wait(Native Method)
+        at java.lang.Object.wait(Object.java:502)
+        at java.lang.ref.Reference.tryHandlePending(Reference.java:191)
+        at java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
+
+"main" 
+   java.lang.Thread.State: RUNNABLE
+        at java.lang.ProcessImpl.waitForInterruptibly(Native Method)
+        at java.lang.ProcessImpl.waitFor(ProcessImpl.java:449)
+        at com.example.PostgreSQLTest.executeSQLFile(PostgreSQLTest.java:53)
+        at com.example.PostgreSQLTest.setup(PostgreSQLTest.java:75)
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+        at java.lang.reflect.Method.invoke(Method.java:498)
+        at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:727)
+        at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+        at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+        at org.junit.jupiter.engine.extension.TimeoutExtension.interceptLifecycleMethod(TimeoutExtension.java:128)
+        at org.junit.jupiter.engine.extension.TimeoutExtension.interceptBeforeAllMethod(TimeoutExtension.java:70)
+        at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor$$Lambda$301/967160.apply(Unknown Source)
+        at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+        at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall$$Lambda$138/20031308.apply(Unknown Source)
+        at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+        at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$$Lambda$302/2520545.apply(Unknown Source)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+        at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+        at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+        at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.lambda$invokeBeforeAllMethods$13(ClassBasedTestDescriptor.java:411)
+        at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor$$Lambda$300/23096331.execute(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+        at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.invokeBeforeAllMethods(ClassBasedTestDescriptor.java:409)
+        at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.before(ClassBasedTestDescriptor.java:215)
+        at org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor.before(ClassBasedTestDescriptor.java:84)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:148)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask$$Lambda$241/31556208.execute(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask$$Lambda$240/13996678.invoke(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask$$Lambda$239/17904746.execute(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+        at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService$$Lambda$245/13556260.accept(Unknown Source)
+        at java.util.ArrayList.forEach(ArrayList.java:1257)
+        at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:155)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask$$Lambda$241/31556208.execute(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:141)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask$$Lambda$240/13996678.invoke(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:139)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask$$Lambda$239/17904746.execute(Unknown Source)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:138)
+        at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:95)
+        at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+        at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+        at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:147)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:127)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:90)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:55)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator$$Lambda$190/15019469.accept(Unknown Source)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:102)
+        at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:54)
+        at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:114)
+        at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:86)
+        at org.junit.platform.launcher.core.DefaultLauncherSession$DelegatingLauncher.execute(DefaultLauncherSession.java:86)
+        at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:55)
+        at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:223)
+        at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:175)
+        at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:139)
+        at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:456)
+        at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:169)
+        at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:595)
+        at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:581)
+
+
+
