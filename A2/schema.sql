@@ -471,3 +471,173 @@ after delete on auction
 for each row 
 when (old.is_sold is true)
 execute function auction_delete_cascade();
+
+
+-- match deletion 
+replace or create function match_delete()
+returns trigger as 
+$$
+begin
+    delete from awards where match_id = old.match_id;
+    delete from balls where match_id = old.match_id;
+    delete from batter_score where match_id = old.match_id;
+    delete from extras where match_id = old.match_id;
+    delete from wickets where match_id = old.match_id;
+    delete from player_match where match_id = old.match_id;
+end;
+$$
+language plpgsql;
+
+create trigger match_delete_cascade
+after delete on match
+for each row 
+execute function match_delete();
+
+-- season deletion 
+create or replace function season_delete()
+return trigger as 
+$$
+begin   
+    delete from auction where season_id = old.season_id;
+    delete from awards where left(match_id,7) = old.season_id;
+    delete from balls where left(match_id,7) = old.season_id;
+    delete from batter_score where left(match_id,7) = old.season_id;
+    delete from extras where left(match_id,7) = old.season_id;
+    delete from match where season_id = old.season_id;
+    delete from player_match where left(match_id,7) = old.season_id;
+    delete from player_team where season_id = old.season_id;
+    delete from wickets where left(match_id,7) = old.season_id;
+end;
+$$
+language plpgsql;
+
+create trigger season_delete_cascase
+after delete on season
+for each row
+execute function season_delete();
+
+-- view for batter_stats 
+
+create or replace view batter_stats as 
+with player_Mat as (
+    select p.player_id, coalesce(count(distinct match_id), 0) as Mat
+    from player as p 
+    join player_match as pm on p.player_id = pm.player_id 
+    group by p.player_id
+),
+player_Inns as (
+    select striker_id as player_id, coalesce(count(distinct match_id), 0) as Inns
+    from balls
+    group by striker_id
+),
+player_R as (
+    select striker_id as player_id, coalesce(sum(run_scored), 0) as R 
+    from balls as b 
+    left join batter_score as bs 
+    on b.match_id = bs.match_id
+    and b.innings_num = bs.innings_num 
+    and b.over_num = bs.over_num
+    and b.ball_num = bs.ball_num
+    group by striker_id
+),
+player_runs_innings as (
+    select striker_id as player_id, b.match_id, coalesce(sum(run_scored), 0) as runs 
+    from balls as b 
+    left join batter_score as bs 
+    on b.match_id = bs.match_id
+    and b.innings_num = bs.innings_num 
+    and b.over_num = bs.over_num
+    and b.ball_num = bs.ball_num
+    group by striker_id, b.match_id
+),
+player_HS as (
+    select player_id, max(runs) as HS
+    from player_runs_innings
+    group by player_id
+),
+player_dismissals as (
+    select player_out_id as player_id, count(distinct match_id) as dismissals 
+    from wickets 
+    group by player_out_id
+),
+player_Avg as (
+    select pr.player_id, 
+        case when coalesce(d.dismissals, 0) = 0 then 0 
+        else pr.R::numeric / d.dismissals 
+        end as Avg
+    from player_R pr
+    left join player_dismissals d on pr.player_id = d.player_id
+),
+player_100s as (
+    select player_id, count(distinct match_id) as hundreds
+    from player_runs_innings 
+    where runs >= 100
+    group by player_id
+),
+player_50s as (
+    select player_id, count(distinct match_id) as fifties
+    from player_runs_innings 
+    where runs >= 50 and runs < 100
+    group by player_id
+),
+player_ducks as (
+    select w.player_out_id as player_id, coalesce(count(distinct p.match_id), 0) as ducks
+    from player_runs_innings as p 
+    join wickets as w
+    on p.player_id = w.player_out_id 
+    and p.match_id = w.match_id 
+    and p.runs = 0
+    group by w.player_out_id
+),
+player_BF as (
+    select striker_id as player_id, coalesce(count(*), 0) as BF
+    from balls 
+    where ball_num is not null
+    group by striker_id
+),
+player_boundaries as (
+    select striker_id as player_id, coalesce(count(*), 0) as boundaries
+    from balls as b 
+    join batter_score as bs
+    on b.match_id = bs.match_id
+    and b.innings_num = bs.innings_num 
+    and b.over_num = bs.over_num
+    and b.ball_num = bs.ball_num
+    where type_run = 'boundary'
+    group by striker_id
+),
+player_not_outs as (
+    select b.striker_id as player_id, coalesce(count(distinct b.match_id), 0) as not_outs
+    from balls as b 
+    left join wickets as w
+    on b.match_id = w.match_id
+    and b.innings_num = w.innings_num 
+    and b.over_num = w.over_num 
+    and b.ball_num = w.ball_num
+    where w.match_id is null
+    group by b.striker_id
+)
+select 
+    pm.player_id,
+    coalesce(pm.Mat, 0) as Mat,
+    coalesce(pi.Inns, 0) as Inns,
+    coalesce(pr.R, 0) as Runs,
+    coalesce(ph.HS, 0) as HS,
+    coalesce(pa.Avg, 0) as Avg,
+    coalesce(p100.hundreds, 0) as "100s",
+    coalesce(p50.fifties, 0) as "50s",
+    coalesce(pd.ducks, 0) as Ducks,
+    coalesce(pb.BF, 0) as BF,
+    coalesce(pbnd.boundaries, 0) as Boundaries,
+    coalesce(pno.not_outs, 0) as NO
+from player_Mat pm
+left join player_Inns pi on pm.player_id = pi.player_id
+left join player_R pr on pm.player_id = pr.player_id
+left join player_HS ph on pm.player_id = ph.player_id
+left join player_Avg pa on pm.player_id = pa.player_id
+left join player_100s p100 on pm.player_id = p100.player_id
+left join player_50s p50 on pm.player_id = p50.player_id
+left join player_ducks pd on pm.player_id = pd.player_id
+left join player_BF pb on pm.player_id = pb.player_id
+left join player_boundaries pbnd on pm.player_id = pbnd.player_id
+left join player_not_outs pno on pm.player_id = pno.player_id;
