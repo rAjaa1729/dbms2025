@@ -46,7 +46,7 @@ create table match(
 create table player_match(
     player_id varchar(20) references player(player_id) not null,
     match_id varchar(20) references match(match_id) not null,
-    role varchar(20)    check(role in ('bowler','batter','allrounder','wicketkeeper')),
+    role varchar(20)    check(role in ('bowler','batter','allrounder','wicketkeeper')) not null,
     team_id varchar(20) references team(team_id) not null,
     is_extra boolean not null,
     primary key (player_id,match_id)
@@ -102,9 +102,9 @@ create table batter_score (
     ball_num smallint not null,
     run_scored smallint check(run_scored >= 0) not null,
     type_run varchar(20) check ( type_run in ('running','boundary')),
-    primary key (match_id,innings_num,over_num,ball_num),
-    foreign key (match_id,innings_num,over_num,ball_num)
-        references balls(match_id,innings_num,over_num,ball_num)
+    primary key (match_id,over_num,innings_num,ball_num),
+    foreign key (match_id,over_num,innings_num,ball_num)
+        references balls(match_id,over_num,innings_num,ball_num)
 );
 
 create table extras (
@@ -112,8 +112,8 @@ create table extras (
     innings_num smallint not null,
     over_num smallint not null,
     ball_num smallint not null,
-    extras_runs smallint check (extras_runs >= 0) not null,
-    extra_type varchar(20) check( extra_type in ('no_balls','wide','byes','legbyes')) not null,
+    extra_runs smallint check (extra_runs >= 0) not null,
+    extra_type varchar(20) check( extra_type in ('no_ball','wide','byes','legbyes')) not null,
     primary key (match_id,innings_num,over_num,ball_num),
     foreign key (match_id,innings_num,over_num,ball_num)
         references balls(match_id,innings_num,over_num,ball_num)
@@ -663,7 +663,7 @@ bowler_W as (
     group by bowler_id
 ),
 bowler_Runs as (
-    select bowler_id as player_id, coalesce(sum(bs.run_scored), 0) + coalesce(sum(e.extras_runs), 0) as Runs
+    select bowler_id as player_id, coalesce(sum(bs.run_scored), 0) + coalesce(sum(e.extra_runs), 0) as Runs
     from balls as b
     left join batter_score as bs 
     on b.match_id = bs.match_id
@@ -708,7 +708,7 @@ bowler_SR as (
     left join bowler_W as bw on bb.player_id = bw.player_id
 ),
 bowler_Extras as (
-    select bowler_id as player_id, coalesce(sum(e.extras_runs), 0) as Extras
+    select bowler_id as player_id, coalesce(sum(e.extra_runs), 0) as Extras
     from balls as b
     left join extras as e 
     on b.match_id = e.match_id
@@ -764,3 +764,4 @@ from player p
 left join fielder_C fc on p.player_id = fc.player_id
 left join fielder_St fs on p.player_id = fs.player_id
 left join fielder_RO fro on p.player_id = fro.player_id;
+
