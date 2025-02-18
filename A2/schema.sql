@@ -204,11 +204,8 @@ returns trigger as $$
 declare 
     maxserial int;
     expected_match_id varchar(20);
-    expected_season_id varchar(20);
-    extracted_serial_no int;
+
 begin
-    expected_season_id := left(new.match_id,7);
-    extracted_serial_no := right(new.match_id,3)::int;
 
     select coalesce(max(right(match_id,3)::int),0)
     into maxserial 
@@ -229,3 +226,161 @@ create trigger check_match_id
 before insert or update on match
 for each row 
 execute function validate_match_id();
+
+-- limit on internation player per team
+create or replace function check_inter_player()
+returns trigger as 
+$$
+declare
+    num_player int;
+    player_type varchar(20);
+begin
+
+    select country_name 
+    into player_type
+    from player 
+    where player_id = new.player_id;
+
+    if player_type <> 'India' then 
+
+        select coalesce(count(*),0)
+        into num_player
+        from player_team  as pt join player as p on pt.player_id = p.player_id
+        where new.season_id = pt.season_id and p.country_name <> 'India' and team_id = new.team_id;
+
+        if num_player>2 then
+            raise exception 'there could be atmost 3 international player per team per season';
+        end if;
+        
+    end if;
+    return new;
+end;
+$$ 
+language plpgsql;
+
+create trigger limit_inter_player
+before insert or update on player_team
+for each row
+execute function check_inter_player();
+
+-- limit on number of home matches
+
+create or replace function limit_home_matches()
+returns trigger as 
+$$
+declare 
+    team_1_region varchar(20);
+    team_2_region varchar(20);
+    count_1 int;
+    count_2 int;
+begin
+    if new.match_type = 'league' then
+        select region into team_1_region
+        from team where team_id = new.team_1_id;
+
+        select region into team_2_region 
+        from team where team_id = new.team_2_id;
+
+        if (new.venue <> team_1_region and new.venue <> team_2_region) then
+            raise exception 'league match must be played at home ground of one of the teams';
+        end if;
+
+        select coalesce(count(*),0) into count_1
+        from match
+        where (team_1_id = new.team_1_id or team_2_id = new.team_1_id)
+        and venue = team_1_region;
+
+        select coalesce(count(*),0) into count_2
+        from match
+        where (team_1_id = new.team_2_id or team_2_id = new.team_2_id)
+        and venue = team_2_region;
+
+        if new.venue = team_1_region then
+            count_1 = count_1 + 1;
+        end if;
+
+        if new.venue = team_2_region then
+            count_2 = count_2 + 1;
+        end if;
+
+        if (count_1 >1 or count_2 > 1 ) then
+            raise exception 'each team can play only one home match in a league against another team';
+        end if;
+    end if;
+    return new;
+end;
+$$
+language plpgsql;
+
+
+create trigger limit_count_home_matches
+before insert or update on match
+for each row
+execute function limit_home_matches();
+
+-- 
+create or replace function updating_match_row()
+returns trigger as 
+$$
+declare
+    best_batter int;
+    best_bowler int;
+begin
+    if new.win_type='draw' then
+        winner_team_id = null;
+    end if;
+    if new.win_type='runs' then
+        new.winner_team_id = 
+        case 
+            when old.toss_winner = 1 and old.toss_decide = 'bat' then old.team_2_id
+            when old.toss_winner = 1 and old.toss_decide = 'bowl'then  old.team_1_id
+            when old.toss_winner = 2 and old.toss_decide = 'bat' then old.team_1_id
+            when old.toss_winner = 2 and old.toss_decide = 'bowl'then  old.team_2_id
+        end;
+    end if;
+    if new.win_type='wickets' then
+        new.winner_team_id = 
+        case 
+            when old.toss_winner = 1 and old.toss_decide = 'bat' then old.team_1_id
+            when old.toss_winner = 1 and old.toss_decide = 'bowl'then  old.team_2_id
+            when old.toss_winner = 2 and old.toss_decide = 'bat' then old.team_2_id
+            when old.toss_winner = 2 and old.toss_decide = 'bowl'then  old.team_1_id
+        end;
+    end if;
+    -- awards updated 
+    
+    select striker_id
+    into best_batter 
+    from balls as b natural join batter_score as bt
+    where match_id = new.match_id
+    group by striker_id
+    order by desc sum(run_scored),striker_id
+    limit 1;
+
+    select top 1 bowler_id 
+    into best_bowler
+    from balls as b natural join wickets as w
+    where match_id = new.match_id
+    group by bowler_id
+    order by desc count(*),bowler_id
+    limit 1;
+
+    insert into awards (match_id,award_type,player_id)
+    values (new.match_id,'orange_cap',best_batter);
+
+    insert into awards (match_id,award_type,player_id)
+    values (new.match_id,'purple_cap',best_bowler);
+
+    return new;
+end;
+$$
+language plpgsql;
+
+
+
+
+create trigger update_match_row
+before update on match
+for each row
+when (old.win_type is null and new.win_type is not null)
+execute function updating_match_row();
