@@ -631,13 +631,134 @@ select
     coalesce(pbnd.boundaries, 0) as Boundaries,
     coalesce(pno.not_outs, 0) as NO
 from player_Mat pm
-left join player_Inns pi on pm.player_id = pi.player_id
-left join player_R pr on pm.player_id = pr.player_id
+left join  player_Inns pi on pm.player_id = pi.player_id
+left join player_R pr on  pm.player_id = pr.player_id
 left join player_HS ph on pm.player_id = ph.player_id
-left join player_Avg pa on pm.player_id = pa.player_id
+left join player_Avg pa  on pm.player_id =  pa.player_id
 left join player_100s p100 on pm.player_id = p100.player_id
-left join player_50s p50 on pm.player_id = p50.player_id
-left join player_ducks pd on pm.player_id = pd.player_id
-left join player_BF pb on pm.player_id = pb.player_id
-left join player_boundaries pbnd on pm.player_id = pbnd.player_id
-left join player_not_outs pno on pm.player_id = pno.player_id;
+left join player_50s p50  on pm.player_id = p50.player_id
+left join player_ducks  pd on pm.player_id = pd.player_id
+left join player_BF pb  on pm.player_id  = pb.player_id
+left join player_boundaries pbnd  on pm.player_id = pbnd.player_id
+left join player_not_outs  pno on pm.player_id = pno.player_id;
+
+-- bowler_stats 
+create or replace view bowler_stats as 
+with bowler_B as (
+    select bowler_id as player_id, count(*) as B
+    from balls
+    group by bowler_id
+),
+bowler_W as (
+    select bowler_id as player_id, count(*) as W
+    from balls as b 
+    join wickets as w
+    on b.match_id = w.match_id
+    and b.innings_num = w.innings_num
+    and b.over_num = w.over_num
+    and b.ball_num = w.ball_num
+    where w.kind_out in ('bowled', 'caught', 'lbw', 'stumped')
+    group by bowler_id
+),
+bowler_Runs as (
+    select bowler_id as player_id, coalesce(sum(bs.run_scored), 0) + coalesce(sum(e.extras_runs), 0) as Runs
+    from balls as b
+    left join batter_score as bs 
+    on b.match_id = bs.match_id
+    and b.innings_num = bs.innings_num 
+    and b.over_num = bs.over_num
+    and b.ball_num = bs.ball_num
+    left join extras as e 
+    on b.match_id = e.match_id
+    and b.innings_num = e.innings_num 
+    and b.over_num = e.over_num
+    and b.ball_num = e.ball_num
+    group by bowler_id
+),
+bowler_Over as (
+    select bowler_id as player_id, 
+           count(distinct concat(match_id, innings_num, over_num)) as total_overs
+    from balls
+    group by bowler_id
+),
+bowler_Avg as (
+    select br.player_id, 
+           case when coalesce(bw.W, 0) = 0 then 0 
+           else cast(br.Runs as double precision) / cast(bw.W as double precision)
+           end as Avg
+    from bowler_Runs as br
+    left join bowler_W as bw on br.player_id = bw.player_id
+),
+bowler_Econ as (
+    select br.player_id,
+           case when coalesce(bo.total_overs, 0) = 0 then 0 
+           else cast(br.Runs as double precision) / (cast(bo.total_overs * 6 as double precision))
+           end as Econ
+    from bowler_Runs as br
+    left join bowler_Over as bo on br.player_id = bo.player_id
+),
+bowler_SR as (
+    select bb.player_id, 
+           case when coalesce(bw.W, 0) = 0 then 0 
+           else cast(bb.B as double precision) / cast(bw.W as double precision)
+           end as SR
+    from bowler_B as bb
+    left join bowler_W as bw on bb.player_id = bw.player_id
+),
+bowler_Extras as (
+    select bowler_id as player_id, coalesce(sum(e.extras_runs), 0) as Extras
+    from balls as b
+    left join extras as e 
+    on b.match_id = e.match_id
+    and b.innings_num = e.innings_num 
+    and b.over_num = e.over_num
+    and b.ball_num = e.ball_num
+    group by bowler_id
+)
+select 
+    bb.player_id,
+    coalesce(bb.B, 0) as B,
+    coalesce(bw.W, 0) as W,
+    coalesce(br.Runs, 0) as Runs,
+    coalesce(ba.Avg, 0)::double precision as Avg,
+    coalesce(be.Econ, 0)::double precision as Econ,
+    coalesce(bs.SR, 0)::double precision as SR,
+    coalesce(bex.Extras, 0) as Extras
+from bowler_B bb
+left join bowler_W bw on bb.player_id = bw.player_id
+left join bowler_Runs br on bb.player_id = br.player_id
+left join bowler_Avg ba on bb.player_id = ba.player_id
+left join bowler_Econ be on bb.player_id = be.player_id
+left join bowler_SR bs on bb.player_id = bs.player_id
+left join bowler_Extras bex on bb.player_id = bex.player_id;
+
+-- fielder stats
+
+create or replace view fielder_stats as 
+with fielder_C as (
+    select fielder_id as player_id, count(*) as C
+    from wickets
+    where kind_out = 'caught'
+    group by fielder_id
+),
+fielder_St as (
+    select fielder_id as player_id, count(*) as St
+    from wickets
+    where kind_out = 'stumped'
+    group by fielder_id
+),
+fielder_RO as (
+    select fielder_id as player_id, count(*) as RO
+    from wickets
+    where kind_out = 'runout'
+    group by fielder_id
+)
+select 
+    p.player_id,
+    coalesce(fc.C, 0) as C,
+    coalesce(fs.St, 0) as St,
+    coalesce(fro.RO, 0) as RO
+from player p
+left join fielder_C fc on p.player_id = fc.player_id
+left join fielder_St fs on p.player_id = fs.player_id
+left join fielder_RO fro on p.player_id = fro.player_id;
