@@ -1,4 +1,3 @@
-%%sql
 create table season(
     season_id varchar(20) primary key not null,
     year smallint check(year between 1900 and 2025) not null,
