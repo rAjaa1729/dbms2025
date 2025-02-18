@@ -139,7 +139,8 @@ create table awards(
 
 -- wicket keeper validation
 create or replace function validate_wicketkeeper_role()
-returns trigger as $$
+returns trigger as 
+$$
 begin 
     if new.kind_out = 'stumped' then
         if not exists (
@@ -154,7 +155,8 @@ begin
     end if;
     return new;
 end;
-$$ language plpgsql;
+$$ 
+language plpgsql;
 
 create trigger check_wicketkeeper_role
 before insert or update on wickets
@@ -163,7 +165,8 @@ execute function validate_wicketkeeper_role();
 
 -- automatic insertion into player team
 create or replace function play_team_by_auction()
-returns trigger as $$
+returns trigger as 
+$$
 begin 
     if new.is_sold = true then
         insert into player_team (player_id,team_id,season_id)
@@ -171,7 +174,8 @@ begin
     end if;
     return new;
 end;
-$$ language plpgsql;
+$$ 
+language plpgsql;
 
 create trigger player_team_dueto_auction
 after insert on auction
@@ -180,14 +184,48 @@ execute function play_team_by_auction();
 
 -- automatic season id generation
 create or replace function update_season_id()
-returns trigger  as $$
+returns trigger  as 
+$$
 begin
     new.season_id = 'IPL' || new.year;
     return new;
 end;
-$$ language plpgsql;
+$$ 
+language plpgsql;
 
 create trigger generate_season_id
 before insert on season
 for each row
 execute function update_season_id();
+
+-- match_id validation 
+create or replace function validate_match_id()
+returns trigger as $$
+declare 
+    maxserial int;
+    expected_match_id varchar(20);
+    expected_season_id varchar(20);
+    extracted_serial_no int;
+begin
+    expected_season_id := left(new.match_id,7);
+    extracted_serial_no := right(new.match_id,3)::int;
+
+    select coalesce(max(right(match_id,3)::int),0)
+    into maxserial 
+    from match
+    where season_id = new.season_id;
+
+    expected_match_id := new.season_id || lpad((maxserial+1)::text,3,'0');
+    
+    if match_id <> expected_match_id then
+        raise exception 'sequence of match id violated';
+    end if;
+
+    return new;
+end; 
+$$ language plpgsql;
+
+create trigger check_match_id
+before insert or update on match
+for each row 
+execute function validate_match_id();
