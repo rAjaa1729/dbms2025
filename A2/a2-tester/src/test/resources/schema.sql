@@ -347,11 +347,11 @@ begin
     select striker_id
     into best_batter 
     from balls as b join batter_score as bt
-    where b.match_id = new.match_id
-    and b.match_id = bt.match_id
+    on b.match_id = bt.match_id
     and b.innings_num = bt.innings_num
     and b.over_num = bt.over_num
     and b.ball_num = bt.ball_num
+    where b.match_id = new.match_id
     group by striker_id
     order by sum(run_scored) desc,striker_id
     limit 1;
@@ -359,20 +359,24 @@ begin
     select bowler_id 
     into best_bowler
     from balls as b join wickets as w
-    where b.match_id = new.match_id
-    and b.match_id = w.match_id
+    on b.match_id = w.match_id
     and b.innings_num = w.innings_num
     and b.over_num = w.over_num
     and b.ball_num = w.ball_num
+    where b.match_id = new.match_id
     group by bowler_id
     order by count(*) desc,bowler_id
     limit 1;
 
-    insert into awards (match_id,award_type,player_id)
-    values (new.match_id,'orange_cap',best_batter);
+    if best_batter is not null then
+        insert into awards (match_id,award_type,player_id)
+        values (new.match_id,'orange_cap',best_batter);
+    end if;
 
-    insert into awards (match_id,award_type,player_id)
-    values (new.match_id,'purple_cap',best_bowler);
+    if best_bowler is not null then
+        insert into awards (match_id,award_type,player_id)
+        values (new.match_id,'purple_cap',best_bowler);
+    end if;
 
     return new;
 end;
@@ -385,95 +389,6 @@ before update on match
 for each row
 when (old.win_type is null and new.win_type is not null)
 execute function updating_match_row();
-
--- auction deletion
-create or replace function auction_delete_cascade()
-returns trigger as 
-$$
-begin
-    -- Create a temporary table to store bad balls
-    create temporary table bad_balls (
-        match_id varchar(20),
-        innings_num smallint,
-        over_num smallint,
-        ball_num smallint
-    );
-
-    -- storing bad balls
-    insert into bad_balls (match_id, innings_num, over_num, ball_num)
-    select b.match_id, b.innings_num, b.over_num, b.ball_num
-    from balls as b
-    where left(b.match_id, 7) = old.season_id
-    and (b.striker_id = old.player_id 
-        or b.non_striker_id = old.player_id 
-        or b.bowler_id = old.player_id);
-
-    -- storing bad balls
-    insert into bad_balls (match_id, innings_num, over_num, ball_num)
-    select w.match_id, w.innings_num, w.over_num, w.ball_num
-    from wickets as w
-    where left(w.match_id, 7) = old.season_id
-    and (w.fielder_id = old.player_id 
-        or w.player_out_id = old.player_id);
-
-    -- remove from batter score
-    delete from batter_score as bs
-    where exists (
-        select 1
-        from bad_balls as tbb
-        where bs.match_id = tbb.match_id 
-        and bs.innings_num = tbb.innings_num 
-        and bs.over_num = tbb.over_num 
-        and bs.ball_num = tbb.ball_num
-    );
-
-    -- remove from extras 
-    delete from extras as e
-    where exists (
-        select 1
-        from bad_balls as tbb
-        where e.match_id = tbb.match_id 
-        and e.innings_num = tbb.innings_num 
-        and e.over_num = tbb.over_num 
-        and e.ball_num = tbb.ball_num
-    );
-
-    -- removing wickets related 
-    delete from wickets as w
-    where exists (
-        select 1
-        from bad_balls as tbb
-        where w.match_id = tbb.match_id 
-        and w.innings_num = tbb.innings_num 
-        and w.over_num = tbb.over_num 
-        and w.ball_num = tbb.ball_num
-    );
-
-    -- removing bad balls
-    delete from balls as b
-    where exists (
-        select 1
-        from bad_balls as tbb
-        where b.match_id = tbb.match_id 
-        and b.innings_num = tbb.innings_num 
-        and b.over_num = tbb.over_num 
-        and b.ball_num = tbb.ball_num
-    );
-
-    -- Clean up the temporary table
-    drop table if exists bad_balls;
-
-    -- Return the old record
-    return old;
-end;
-$$
-language plpgsql;
-
-create trigger auction_delete 
-after delete on auction
-for each row 
-when (old.is_sold is true)
-execute function auction_delete_cascade();
 
 
 -- match deletion 
