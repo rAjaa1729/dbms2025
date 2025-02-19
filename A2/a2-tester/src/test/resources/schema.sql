@@ -1,3 +1,6 @@
+
+DROP TABLE IF EXISTS awards, wickets, extras, batter_score, balls, player_match, player_team, auction, match, player, team, season CASCADE;
+
 create table player(
     player_id varchar(20) primary key not null,
     player_name varchar(255) not null,
@@ -785,11 +788,26 @@ fielder_RO as (
 )
 select 
     p.player_id,
-    coalesce(fc.C, 0) as C,
-    coalesce(fs.St, 0) as St,
-    coalesce(fro.RO, 0) as RO
+    coalesce(fc.C, 0) as "C",
+    coalesce(fs.St, 0) as "St",
+    coalesce(fro.RO, 0) as "RO"
 from player p
 left join fielder_C fc on p.player_id = fc.player_id
 left join fielder_St fs on p.player_id = fs.player_id
 left join fielder_RO fro on p.player_id = fro.player_id;
 
+
+
+
+
+drop trigger if exists check_wicketkeeper_role on wickets;
+drop trigger if exists player_team_dueto_auction on auction;
+drop trigger if exists insert_check_match_id on match;
+drop trigger if exists update_check_match_id on match;
+drop trigger if exists limit_inter_player on player_team;
+drop trigger if exists limit_count_home_matches on match;
+drop trigger if exists updating_match_row on match;
+drop trigger if exists auction_delete on auction;
+drop trigger if exists match_delete_cascade on match;
+drop trigger if exists season_delete_cascase on season;
+drop trigger if exists generate_season_id on season;
