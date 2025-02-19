@@ -533,12 +533,12 @@ for each row
 execute function season_delete();
 
 -- view for batter_stats 
-
+%%sql
 create or replace view batter_stats as 
 with player_Mat as (
     select p.player_id, coalesce(count(distinct match_id), 0) as Mat
     from player as p 
-    join player_match as pm on p.player_id = pm.player_id 
+    left join player_match as pm on p.player_id = pm.player_id 
     group by p.player_id
 ),
 player_Inns as (
@@ -578,8 +578,8 @@ player_dismissals as (
 ),
 player_Avg as (
     select pr.player_id, 
-        case when coalesce(d.dismissals, 0) = 0 then 0 
-        else pr.R::numeric / d.dismissals 
+        case when coalesce(d.dismissals, 0) = 0 then 0::double precision 
+        else ((pr.R::double precision) / d.dismissals )::double precision
         end as Avg
     from player_R pr
     left join player_dismissals d on pr.player_id = d.player_id
@@ -596,7 +596,7 @@ player_50s as (
     where runs >= 50 and runs < 100
     group by player_id
 ),
-player_ducks as (
+player_Ducks as (
     select w.player_out_id as player_id, coalesce(count(distinct p.match_id), 0) as ducks
     from player_runs_innings as p 
     join wickets as w
@@ -607,9 +607,21 @@ player_ducks as (
 ),
 player_BF as (
     select striker_id as player_id, coalesce(count(*), 0) as BF
-    from balls 
-    where ball_num is not null
+    from balls as b left join extras as e
+    on b.match_id = e.match_id
+    and b.innings_num = e.innings_num
+    and b.over_num = e.over_num
+    and b.ball_num = e.ball_num
+    where e.extra_type is null
     group by striker_id
+),
+player_SR as (
+    select pr.player_id,
+        case when bf = 0 then 0::double precision
+        else (((pr.R::double precision)*100) / bf)::double precision
+        end as SR
+    from player_R as pr
+    join player_BF as bf on pr.player_id = bf.player_id
 ),
 player_boundaries as (
     select striker_id as player_id, coalesce(count(*), 0) as boundaries
@@ -630,27 +642,29 @@ player_not_outs as (
     and b.innings_num = w.innings_num 
     and b.over_num = w.over_num 
     and b.ball_num = w.ball_num
-    where w.match_id is null
+    where w.player_out_id is NULL
     group by b.striker_id
 )
 select 
     pm.player_id,
-    coalesce(pm.Mat, 0) as Mat,
-    coalesce(pi.Inns, 0) as Inns,
-    coalesce(pr.R, 0) as Runs,
-    coalesce(ph.HS, 0) as HS,
-    coalesce(pa.Avg, 0) as Avg,
+    coalesce(pm.Mat, 0) as "Mat",
+    coalesce(pi.Inns, 0) as "Inns",
+    coalesce(pr.R, 0) as "R",
+    coalesce(ph.HS, 0) as "HS",
+    coalesce(pa.Avg, 0.0)::double precision as "Avg",
+    coalesce(psr.SR, 0.0)::double precision as "SR",
     coalesce(p100.hundreds, 0) as "100s",
     coalesce(p50.fifties, 0) as "50s",
-    coalesce(pd.ducks, 0) as Ducks,
-    coalesce(pb.BF, 0) as BF,
-    coalesce(pbnd.boundaries, 0) as Boundaries,
-    coalesce(pno.not_outs, 0) as NO
+    coalesce(pd.ducks, 0) as "Ducks",
+    coalesce(pb.BF, 0) as "BF",
+    coalesce(pbnd.boundaries, 0) as "Boundaries",
+    coalesce(pno.not_outs, 0) as "NO"
 from player_Mat pm
 left join  player_Inns pi on pm.player_id = pi.player_id
 left join player_R pr on  pm.player_id = pr.player_id
 left join player_HS ph on pm.player_id = ph.player_id
 left join player_Avg pa  on pm.player_id =  pa.player_id
+left join player_SR psr on pm.player_id = psr.player_id
 left join player_100s p100 on pm.player_id = p100.player_id
 left join player_50s p50  on pm.player_id = p50.player_id
 left join player_ducks  pd on pm.player_id = pd.player_id
@@ -699,16 +713,16 @@ bowler_Over as (
 ),
 bowler_Avg as (
     select br.player_id, 
-           case when coalesce(bw.W, 0) = 0 then 0 
-           else cast(br.Runs as double precision) / cast(bw.W as double precision)
+           case when coalesce(bw.W, 0) = 0 then 0::double precision
+           else (br.Runs::double precision) / (bw.W::double precision)
            end as Avg
     from bowler_Runs as br
     left join bowler_W as bw on br.player_id = bw.player_id
 ),
 bowler_Econ as (
     select br.player_id,
-           case when coalesce(bo.total_overs, 0) = 0 then 0 
-           else cast(br.Runs as double precision) / (cast(bo.total_overs * 6 as double precision))
+           case when coalesce(bo.total_overs, 0) = 0 then 0::double precision
+           else (br.Runs::double precision) / (bo.total_overs::double precision)
            end as Econ
     from bowler_Runs as br
     left join bowler_Over as bo on br.player_id = bo.player_id
@@ -716,7 +730,7 @@ bowler_Econ as (
 bowler_SR as (
     select bb.player_id, 
            case when coalesce(bw.W, 0) = 0 then 0 
-           else cast(bb.B as double precision) / cast(bw.W as double precision)
+           else (bb.B::double precision) / (bw.W::double precision)
            end as SR
     from bowler_B as bb
     left join bowler_W as bw on bb.player_id = bw.player_id
@@ -733,13 +747,13 @@ bowler_Extras as (
 )
 select 
     bb.player_id,
-    coalesce(bb.B, 0) as B,
-    coalesce(bw.W, 0) as W,
-    coalesce(br.Runs, 0) as Runs,
-    coalesce(ba.Avg, 0)::double precision as Avg,
-    coalesce(be.Econ, 0)::double precision as Econ,
-    coalesce(bs.SR, 0)::double precision as SR,
-    coalesce(bex.Extras, 0) as Extras
+    coalesce(bb.B, 0) as "B",
+    coalesce(bw.W, 0) as "W",
+    coalesce(br.Runs, 0) as "Runs",
+    coalesce(ba.Avg, 0)::double precision as "Avg",
+    coalesce(be.Econ, 0)::double precision as "Econ",
+    coalesce(bs.SR, 0)::double precision as "SR",
+    coalesce(bex.Extras, 0) as "Extras"
 from bowler_B bb
 left join bowler_W bw on bb.player_id = bw.player_id
 left join bowler_Runs br on bb.player_id = br.player_id
