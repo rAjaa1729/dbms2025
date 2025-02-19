@@ -7,6 +7,7 @@ create table player(
     country_name varchar(20) not null
 );
 
+
 create table team(
     team_id varchar(20) primary key not null,
     team_name varchar(255) unique not null,
@@ -139,7 +140,7 @@ create table wickets (
 
 
 
--- wicket keeper validation
+-- wicket keeper validation : check done
 create or replace function validate_wicketkeeper_role()
 returns trigger as 
 $$
@@ -165,7 +166,7 @@ before insert or update on wickets
 for each row 
 execute function validate_wicketkeeper_role();
 
--- automatic insertion into player team
+-- automatic insertion into player team : check done
 create or replace function play_team_by_auction()
 returns trigger as 
 $$
@@ -184,7 +185,7 @@ after insert on auction
 for each row
 execute function play_team_by_auction();
 
--- automatic season id generation
+-- automatic season id generation : check done
 create or replace function update_season_id()
 returns trigger  as 
 $$
@@ -200,8 +201,8 @@ before insert on season
 for each row
 execute function update_season_id();
 
--- match_id validation 
-create or replace function validate_match_id()
+-- match_id validation  : checked
+create or replace function insert_validate_match_id()
 returns trigger as $$
 declare 
     maxserial int;
@@ -224,12 +225,12 @@ begin
 end; 
 $$ language plpgsql;
 
-create trigger check_match_id
-before insert or update on match
+create trigger insert_check_match_id
+before insert on match
 for each row 
-execute function validate_match_id();
+execute function insert_validate_match_id();
 
--- limit on internation player per team
+-- limit on internation player per team : checked
 create or replace function check_inter_player()
 returns trigger as 
 $$
@@ -242,7 +243,6 @@ begin
     into player_type
     from player 
     where player_id = new.player_id;
-
     if player_type <> 'India' then 
 
         select coalesce(count(*),0)
@@ -250,7 +250,7 @@ begin
         from player_team  as pt join player as p on pt.player_id = p.player_id
         where new.season_id = pt.season_id and p.country_name <> 'India' and team_id = new.team_id;
 
-        if num_player>2 then
+        if num_player>3 then
             raise exception 'there could be atmost 3 international player per team per season';
         end if;
         
@@ -261,15 +261,12 @@ $$
 language plpgsql;
 
 create trigger limit_inter_player
-before insert or update on player_team
+after insert or update on player_team
 for each row
 execute function check_inter_player();
 
--- limit on number of home matches
+-- limit on number of home matches : checked
 
-create or replace function limit_home_matches()
-returns trigger as 
-$$
 declare 
     team_1_region varchar(20);
     team_2_region varchar(20);
@@ -289,21 +286,16 @@ begin
 
         select coalesce(count(*),0) into count_1
         from match
-        where (team_1_id = new.team_1_id or team_2_id = new.team_1_id)
+        where ((team_1_id = new.team_1_id and team_2_id = new.team_2_id)
+        or (team_1_id = new.team_2_id and team_2_id = new.team_1_id))
         and venue = team_1_region;
 
         select coalesce(count(*),0) into count_2
         from match
-        where (team_1_id = new.team_2_id or team_2_id = new.team_2_id)
+        where ((team_1_id = new.team_2_id and team_2_id = new.team_2_id)
+        or (team_1_id = new.team_2_id and team_2_id = new.team_1_id))
         and venue = team_2_region;
 
-        if new.venue = team_1_region then
-            count_1 = count_1 + 1;
-        end if;
-
-        if new.venue = team_2_region then
-            count_2 = count_2 + 1;
-        end if;
 
         if (count_1 >1 or count_2 > 1 ) then
             raise exception 'each team can play only one home match in a league against another team';
@@ -316,20 +308,21 @@ language plpgsql;
 
 
 create trigger limit_count_home_matches
-before insert or update on match
+after insert or update on match
 for each row
 execute function limit_home_matches();
 
--- 
+--  updating match row : checked
+
 create or replace function updating_match_row()
 returns trigger as 
 $$
 declare
-    best_batter int;
-    best_bowler int;
+    best_batter varchar(20);
+    best_bowler varchar(20);
 begin
     if new.win_type='draw' then
-        winner_team_id = null;
+        new.winner_team_id := null;
     end if;
     if new.win_type='runs' then
         new.winner_team_id = 
@@ -353,16 +346,24 @@ begin
     
     select striker_id
     into best_batter 
-    from balls as b natural join batter_score as bt
-    where match_id = new.match_id
+    from balls as b join batter_score as bt
+    where b.match_id = new.match_id
+    and b.match_id = bt.match_id
+    and b.innings_num = bt.innings_num
+    and b.over_num = bt.over_num
+    and b.ball_num = bt.ball_num
     group by striker_id
     order by sum(run_scored) desc,striker_id
     limit 1;
 
-    select top 1 bowler_id 
+    select bowler_id 
     into best_bowler
-    from balls as b natural join wickets as w
-    where match_id = new.match_id
+    from balls as b join wickets as w
+    where b.match_id = new.match_id
+    and b.match_id = w.match_id
+    and b.innings_num = w.innings_num
+    and b.over_num = w.over_num
+    and b.ball_num = w.ball_num
     group by bowler_id
     order by count(*) desc,bowler_id
     limit 1;

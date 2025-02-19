@@ -1,17 +1,3 @@
-create table season(
-    season_id varchar(20) primary key not null,
-    year smallint check(year between 1900 and 2025) not null,
-    start_date date not null,
-    end_date date not null
-);
-
-create table team(
-    team_id varchar(20) primary key not null,
-    team_name varchar(255) unique not null,
-    coach_name varchar(255) not null,
-    region varchar(20) unique not null
-);
-
 create table player(
     player_id varchar(20) primary key not null,
     player_name varchar(255) not null,
@@ -21,8 +7,22 @@ create table player(
     country_name varchar(20) not null
 );
 
+create table team(
+    team_id varchar(20) primary key not null,
+    team_name varchar(255) unique not null,
+    coach_name varchar(255) not null,
+    region varchar(20) unique not null
+);
+
+create table season(
+    season_id varchar(20) primary key not null,
+    year smallint check(year between 1900 and 2025) not null,
+    start_date date not null,
+    end_date date not null
+);
+
 create table match(
-    match_id varchar(20) primary key not null,
+    match_id varchar(20) primary key,
     match_type varchar(20) check ( match_type in ('league','playoff','knockout')) not null,
     venue varchar(20) not null,
     team_1_id varchar(20) references team(team_id) not null,
@@ -30,18 +30,27 @@ create table match(
     match_date date not null,
     season_id varchar(20) references season(season_id) not null,
     win_run_margin smallint,
-    win_run_wickets smallint,
+    win_by_wickets smallint,
     win_type varchar(20) check ( win_type in ('runs','wickets','draw')),
     toss_winner smallint check ( toss_winner in (1,2)),
     toss_decide varchar(20) check ( toss_decide in ('bowl','bat')),
     winner_team_id varchar(20) references team(team_id),
     check(
-        (win_type = 'draw' and win_run_margin is null and win_run_wickets is null)
-        or (win_type = 'runs' and win_run_margin is not null and win_run_wickets is null)
-        or (win_type = 'wickets' and win_run_margin is null and win_run_wickets is not null)
+        win_type is null
+        or (win_type = 'draw' and win_run_margin is null and win_by_wickets is null)
+        or (win_type = 'runs' and win_run_margin is not null and win_by_wickets is null)
+        or (win_type = 'wickets' and win_run_margin is null and win_by_wickets is not null)
     )
 );
 
+create table player_match(
+    player_id varchar(20) references player(player_id) not null,
+    match_id varchar(20) references match(match_id) not null,
+    role varchar(20)    check(role in ('bowler','batter','allrounder','wicketkeeper')) not null,
+    team_id varchar(20) references team(team_id) not null,
+    is_extra boolean not null,
+    primary key (player_id,match_id)
+);
 
 create table auction(
     auction_id varchar(20) primary key not null,
@@ -51,8 +60,15 @@ create table auction(
     sold_price bigint,
     is_sold boolean not null,
     team_id varchar(20)     references team(team_id),
-    check(is_sold and sold_price is not null and team_id is not null and sold_price >= base_price),
+    check(is_sold is false or (is_sold is true and sold_price is not null and team_id is not null and sold_price >= base_price)),
     unique(player_id,team_id,season_id)
+);
+
+create table awards(
+    match_id varchar(20) references match(match_id) not null,
+    award_type varchar(20) check (award_type in ('orange_cap','purple_cap')) not null,
+    player_id varchar(20) references player(player_id) not null,
+    primary key (match_id, award_type)
 );
 
 
@@ -66,14 +82,7 @@ create table player_team (
 );
 
 
-create table player_match(
-    player_id varchar(20) references player(player_id) not null,
-    match_id varchar(20) references match(match_id) not null,
-    role varchar(20)    check(role in ('bowler','batter','allrounder','wicketkeeper')),
-    team_id varchar(20) references team(team_id) not null,
-    is_extra boolean not null,
-    primary key (player_id,match_id)
-);
+
 
 create table balls (
     match_id varchar(20) references match(match_id) not null,
@@ -93,9 +102,9 @@ create table batter_score (
     ball_num smallint not null,
     run_scored smallint check(run_scored >= 0) not null,
     type_run varchar(20) check ( type_run in ('running','boundary')),
-    primary key (match_id,innings_num,over_num,ball_num),
-    foreign key (match_id,innings_num,over_num,ball_num)
-        references balls(match_id,innings_num,over_num,ball_num)
+    primary key (match_id,over_num,innings_num,ball_num),
+    foreign key (match_id,over_num,innings_num,ball_num)
+        references balls(match_id,over_num,innings_num,ball_num)
 );
 
 create table extras (
@@ -103,8 +112,8 @@ create table extras (
     innings_num smallint not null,
     over_num smallint not null,
     ball_num smallint not null,
-    extras_runs smallint check (extras_runs >= 0) not null,
-    extra_type varchar(20) check( extra_type in ('no_balls','wide','byes','legbyes')) not null,
+    extra_runs smallint check (extra_runs >= 0) not null,
+    extra_type varchar(20) check( extra_type in ('no_ball','wide','byes','legbyes')) not null,
     primary key (match_id,innings_num,over_num,ball_num),
     foreign key (match_id,innings_num,over_num,ball_num)
         references balls(match_id,innings_num,over_num,ball_num)
@@ -128,12 +137,6 @@ create table wickets (
 );
 
 
-create table awards(
-    match_id varchar(20) references match(match_id) not null,
-    award_type varchar(20) check (award_type in ('orange_cap','purple_cap')) not null,
-    player_id varchar(20) references player(player_id) not null,
-    primary key (match_id, award_type)
-);
 
 
 -- wicket keeper validation
@@ -213,7 +216,7 @@ begin
 
     expected_match_id := new.season_id || lpad((maxserial+1)::text,3,'0');
     
-    if match_id <> expected_match_id then
+    if new.match_id <> expected_match_id then
         raise exception 'sequence of match id violated';
     end if;
 
@@ -660,7 +663,7 @@ bowler_W as (
     group by bowler_id
 ),
 bowler_Runs as (
-    select bowler_id as player_id, coalesce(sum(bs.run_scored), 0) + coalesce(sum(e.extras_runs), 0) as Runs
+    select bowler_id as player_id, coalesce(sum(bs.run_scored), 0) + coalesce(sum(e.extra_runs), 0) as Runs
     from balls as b
     left join batter_score as bs 
     on b.match_id = bs.match_id
@@ -705,7 +708,7 @@ bowler_SR as (
     left join bowler_W as bw on bb.player_id = bw.player_id
 ),
 bowler_Extras as (
-    select bowler_id as player_id, coalesce(sum(e.extras_runs), 0) as Extras
+    select bowler_id as player_id, coalesce(sum(e.extra_runs), 0) as Extras
     from balls as b
     left join extras as e 
     on b.match_id = e.match_id
@@ -761,3 +764,4 @@ from player p
 left join fielder_C fc on p.player_id = fc.player_id
 left join fielder_St fs on p.player_id = fs.player_id
 left join fielder_RO fro on p.player_id = fro.player_id;
+
