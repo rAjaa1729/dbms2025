@@ -313,8 +313,8 @@ for each row
 execute function limit_home_matches();
 
 --  updating match row : checked
-%%sql
-create or replace function updating_match_row()
+
+reate or replace function updating_match_row()
 returns trigger as 
 $$
 declare
@@ -327,19 +327,19 @@ begin
     if new.win_type='runs' then
         new.winner_team_id = 
         case 
-            when old.toss_winner = 1 and old.toss_decide = 'bat' then old.team_2_id
-            when old.toss_winner = 1 and old.toss_decide = 'bowl'then  old.team_1_id
-            when old.toss_winner = 2 and old.toss_decide = 'bat' then old.team_1_id
-            when old.toss_winner = 2 and old.toss_decide = 'bowl'then  old.team_2_id
+            when old.toss_winner = 1 and old.toss_decide = 'bat' then old.team_1_id
+            when old.toss_winner = 1 and old.toss_decide = 'bowl'then  old.team_2_id
+            when old.toss_winner = 2 and old.toss_decide = 'bat' then old.team_2_id
+            when old.toss_winner = 2 and old.toss_decide = 'bowl'then  old.team_1_id
         end;
     end if;
     if new.win_type='wickets' then
         new.winner_team_id = 
         case 
-            when old.toss_winner = 1 and old.toss_decide = 'bat' then old.team_1_id
-            when old.toss_winner = 1 and old.toss_decide = 'bowl'then  old.team_2_id
-            when old.toss_winner = 2 and old.toss_decide = 'bat' then old.team_2_id
-            when old.toss_winner = 2 and old.toss_decide = 'bowl'then  old.team_1_id
+            when old.toss_winner = 1 and old.toss_decide = 'bat' then old.team_2_id
+            when old.toss_winner = 1 and old.toss_decide = 'bowl'then  old.team_1_id
+            when old.toss_winner = 2 and old.toss_decide = 'bat' then old.team_1_id
+            when old.toss_winner = 2 and old.toss_decide = 'bowl'then  old.team_2_id
         end;
     end if;
     -- awards updated 
@@ -390,11 +390,17 @@ for each row
 when (old.win_type is null and new.win_type is not null)
 execute function updating_match_row();
 
--- auction deletion
+-- auction deletion :  checked 
+
 create or replace function auction_delete_cascade()
 returns trigger as 
 $$
 begin
+
+    delete from player_team where player_id = old.player_id;
+    delete from awards where player_id = old.player_id;
+    delete from player_match where player_id = old.player_id;
+
     -- Create a temporary table to store bad balls
     create temporary table bad_balls (
         match_id varchar(20),
@@ -474,52 +480,55 @@ $$
 language plpgsql;
 
 create trigger auction_delete 
-after delete on auction
+before delete on auction
 for each row 
 when (old.is_sold is true)
 execute function auction_delete_cascade();
 
 
 -- match deletion 
-replace or create function match_delete()
+create or replace  function match_delete()
 returns trigger as 
 $$
 begin
     delete from awards where match_id = old.match_id;
-    delete from balls where match_id = old.match_id;
     delete from batter_score where match_id = old.match_id;
     delete from extras where match_id = old.match_id;
     delete from wickets where match_id = old.match_id;
+    delete from balls where match_id = old.match_id;
     delete from player_match where match_id = old.match_id;
+    return old;
 end;
 $$
 language plpgsql;
 
 create trigger match_delete_cascade
-after delete on match
+before delete on match
 for each row 
 execute function match_delete();
 
 -- season deletion 
+
 create or replace function season_delete()
-return trigger as 
+returns trigger as 
 $$
 begin   
     delete from auction where season_id = old.season_id;
     delete from awards where left(match_id,7) = old.season_id;
-    delete from balls where left(match_id,7) = old.season_id;
     delete from batter_score where left(match_id,7) = old.season_id;
     delete from extras where left(match_id,7) = old.season_id;
     delete from match where season_id = old.season_id;
+    delete from balls where left(match_id,7) = old.season_id;
     delete from player_match where left(match_id,7) = old.season_id;
     delete from player_team where season_id = old.season_id;
     delete from wickets where left(match_id,7) = old.season_id;
+    return old;
 end;
 $$
 language plpgsql;
 
 create trigger season_delete_cascase
-after delete on season
+before delete on season
 for each row
 execute function season_delete();
 
