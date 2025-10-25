@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.example.PostgreSQLTest
 -------------------------------------------------------------------------------
-Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.179 s - in com.example.PostgreSQLTest
+Tests run: 20, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.421 s - in com.example.PostgreSQLTest
